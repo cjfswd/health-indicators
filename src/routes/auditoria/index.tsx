@@ -17,6 +17,7 @@ import {
   LuChevronLeft,
   LuChevronRight,
   LuUndo2,
+  LuChevronDown,
 } from "@qwikest/icons/lucide";
 
 const OP_LABELS: Record<string, string> = {
@@ -353,7 +354,7 @@ export default component$(() => {
           <label class="label text-xs">Até</label>
           <input name="endDate" type="date" class="input" style={{ width: "auto" }} />
         </div>
-        <button type="submit" class="btn btn-secondary btn-sm">Filtrar</button>
+        <button type="submit" class="btn btn-secondary">Filtrar</button>
       </form>
 
       {/* Card Timeline */}
@@ -419,25 +420,70 @@ export default component$(() => {
 
                 {/* Human-Readable Diff */}
                 {diff.length > 0 && (
-                  <details open={diff.some((d) => d.type === "changed")}>
-                    <summary class="cursor-pointer text-xs font-medium mb-2" style={{ color: "var(--text-accent)" }}>
-                      {entry.operation === "CREATE" ? "Dados criados" :
-                       entry.operation === "DELETE" ? "Dados removidos" :
-                       entry.operation === "UPDATE" ? `${diff.length} campo(s) alterado(s)` :
-                       "Detalhes"}
+                  <details
+                    open={diff.some((d) => d.type === "changed")}
+                    class="group"
+                    style={{
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--border-default)",
+                      overflow: "hidden",
+                      background: "var(--bg-input)",
+                    }}
+                  >
+                    <summary
+                      class="cursor-pointer flex items-center justify-between px-3 py-2.5 text-xs font-semibold select-none"
+                      style={{
+                        color: "var(--text-primary)",
+                        background: "var(--bg-input)",
+                        listStyle: "none",
+                        transition: "background 0.15s ease",
+                      }}
+                    >
+                      <div class="flex items-center gap-2">
+                        <span
+                          class="inline-flex items-center justify-center rounded-md"
+                          style={{
+                            width: "22px",
+                            height: "22px",
+                            background: opColor.bg,
+                            color: opColor.text,
+                          }}
+                        >
+                          <LuChevronDown
+                            style={{
+                              width: "14px",
+                              height: "14px",
+                              transition: "transform 0.2s ease",
+                            }}
+                            class="group-open:rotate-180"
+                          />
+                        </span>
+                        <span>
+                          {entry.operation === "CREATE" ? "Dados criados" :
+                           entry.operation === "DELETE" ? "Dados removidos" :
+                           entry.operation === "UPDATE" ? `${diff.length} campo(s) alterado(s)` :
+                           "Detalhes"}
+                        </span>
+                      </div>
+                      <span
+                        class="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                        style={{ background: "var(--bg-hover)", color: "var(--text-tertiary)" }}
+                      >
+                        {diff.length} campo{diff.length !== 1 ? "s" : ""}
+                      </span>
                     </summary>
                     <div
-                      class="rounded-lg overflow-hidden text-xs"
-                      style={{ border: "1px solid var(--border-default)" }}
+                      class="overflow-hidden text-xs"
+                      style={{ borderTop: "1px solid var(--border-default)" }}
                     >
                       <table style={{ width: "100%", borderCollapse: "collapse" }}>
                         <thead>
                           <tr style={{ background: "var(--bg-hover)" }}>
-                            <th class="text-left px-3 py-1.5 font-medium" style={{ color: "var(--text-secondary)", width: "30%" }}>Campo</th>
+                            <th class="text-left px-3 py-2 font-medium" style={{ color: "var(--text-secondary)", width: "30%" }}>Campo</th>
                             {(entry.operation === "UPDATE" || entry.operation === "RESTORE") && (
-                              <th class="text-left px-3 py-1.5 font-medium" style={{ color: "var(--text-secondary)", width: "35%" }}>Antes</th>
+                              <th class="text-left px-3 py-2 font-medium" style={{ color: "var(--text-secondary)", width: "35%" }}>Antes</th>
                             )}
-                            <th class="text-left px-3 py-1.5 font-medium" style={{ color: "var(--text-secondary)" }}>
+                            <th class="text-left px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>
                               {entry.operation === "UPDATE" || entry.operation === "RESTORE" ? "Depois" : "Valor"}
                             </th>
                           </tr>
@@ -453,15 +499,15 @@ export default component$(() => {
                                             d.type === "removed" ? "rgba(239,68,68,0.05)" : "transparent",
                               }}
                             >
-                              <td class="px-3 py-1.5 font-medium" style={{ color: "var(--text-primary)" }}>
+                              <td class="px-3 py-2 font-medium" style={{ color: "var(--text-primary)" }}>
                                 {d.label}
                               </td>
                               {(entry.operation === "UPDATE" || entry.operation === "RESTORE") && (
-                                <td class="px-3 py-1.5" style={{ color: "var(--text-tertiary)", textDecoration: d.type === "changed" ? "line-through" : "none" }}>
+                                <td class="px-3 py-2" style={{ color: "var(--text-tertiary)", textDecoration: d.type === "changed" ? "line-through" : "none" }}>
                                   {d.oldVal || "—"}
                                 </td>
                               )}
-                              <td class="px-3 py-1.5" style={{ color: d.type === "changed" ? "#3b82f6" : d.type === "added" ? "#10b981" : "var(--text-secondary)" }}>
+                              <td class="px-3 py-2" style={{ color: d.type === "changed" ? "#3b82f6" : d.type === "added" ? "#10b981" : "var(--text-secondary)" }}>
                                 {d.newVal}
                               </td>
                             </tr>

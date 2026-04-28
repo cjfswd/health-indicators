@@ -37,10 +37,10 @@ export const Header = component$<HeaderProps>(({ onMenuToggle$ }) => {
       }}
     >
       <div class="flex items-center gap-3">
-        {/* Mobile-only menu toggle — hidden on desktop via lg:hidden */}
+        {/* Mobile-only menu toggle — hidden on desktop */}
         <button
           type="button"
-          class="btn btn-ghost btn-icon lg:hidden"
+          class="btn btn-ghost btn-icon"
           onClick$={onMenuToggle$}
           aria-label="Abrir menu"
           id="menu-toggle"

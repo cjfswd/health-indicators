@@ -280,7 +280,7 @@ export default component$(() => {
             <option value="true">Ativo</option>
             <option value="false">Inativo</option>
           </select>
-          <button type="submit" class="btn btn-secondary btn-sm">Filtrar</button>
+          <button type="submit" class="btn btn-secondary">Filtrar</button>
         </form>
       </div>
 

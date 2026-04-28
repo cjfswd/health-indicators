@@ -231,6 +231,8 @@ export default component$(() => {
   const autoOperatorName = useSignal("");
   const editAutoOperatorName = useSignal("");
   const uploadedFiles = useSignal<UploadedFile[]>([]);
+  const selectedUnifiedCategory = useSignal("");
+  const editUnifiedCategory = useSignal("");
 
   const addToast = $((type: ToastData["type"], title: string) => {
     toasts.items = [...toasts.items, createToast(type, title)];
@@ -244,6 +246,7 @@ export default component$(() => {
 
   const patientComboOptions: ComboboxOption[] = patientOptions.value.map((p) => ({ value: p.id, label: p.fullName }));
   const operatorComboOptions: ComboboxOption[] = operatorOptions.value.map((o) => ({ value: o.id, label: o.name }));
+  const categoryComboOptions: ComboboxOption[] = UNIFIED_OPTIONS.map((o) => ({ value: o.value, label: o.label }));
 
   return (
     <div class="space-y-6">
@@ -259,6 +262,7 @@ export default component$(() => {
           selectedPatientId.value = "";
           autoOperatorName.value = "";
           uploadedFiles.value = [];
+          selectedUnifiedCategory.value = "";
           showCreateModal.value = true;
         }}>
           <LuPlus style={{ width: "18px", height: "18px" }} />
@@ -287,7 +291,7 @@ export default component$(() => {
           <label class="label text-xs">Até</label>
           <input name="endDate" type="date" class="input" style={{ width: "auto" }} />
         </div>
-        <button type="submit" class="btn btn-secondary btn-sm">Filtrar</button>
+        <button type="submit" class="btn btn-secondary">Filtrar</button>
       </form>
 
       {/* Card Grid */}
@@ -344,6 +348,7 @@ export default component$(() => {
                       editPatientId.value = ev.patientId;
                       editAutoOperatorName.value = ev.operator?.name || "";
                       uploadedFiles.value = ev.attachments || [];
+                      editUnifiedCategory.value = `${ev.category}::${ev.subCategory || ""}`;
                     }}
                   >
                     <LuPencil style={{ width: "15px", height: "15px" }} />
@@ -378,7 +383,7 @@ export default component$(() => {
           const fd = new FormData(e.target as HTMLFormElement);
           const payload = {
             patientId: selectedPatientId.value,
-            unifiedCategory: fd.get("unifiedCategory") as string,
+            unifiedCategory: selectedUnifiedCategory.value,
             occurredAt: fd.get("occurredAt") as string,
             description: (fd.get("description") as string) || undefined,
             attachments: uploadedFiles.value.length > 0 ? JSON.stringify(uploadedFiles.value) : undefined,
@@ -411,11 +416,16 @@ export default component$(() => {
             )}
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="label" for="ev-unified-cat">Categoria / Subcategoria <span style={{ color: "var(--color-danger)" }}>*</span></label>
-                <select id="ev-unified-cat" name="unifiedCategory" class="input select" required>
-                  <option value="">Selecione...</option>
-                  {UNIFIED_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
-                </select>
+                <Combobox
+                  options={categoryComboOptions}
+                  value={selectedUnifiedCategory.value}
+                  onChange$={(val) => { selectedUnifiedCategory.value = val; }}
+                  placeholder="Buscar categoria..."
+                  label="Categoria / Subcategoria *"
+                  id="ev-unified-cat"
+                  name="unifiedCategory"
+                  required
+                />
               </div>
               <div>
                 <label class="label" for="ev-date">Data do Evento <span style={{ color: "var(--color-danger)" }}>*</span></label>
@@ -445,7 +455,7 @@ export default component$(() => {
           const payload = {
             id: editingEvent.value.id,
             patientId: editPatientId.value || undefined,
-            unifiedCategory: (fd.get("unifiedCategory") as string) || undefined,
+            unifiedCategory: editUnifiedCategory.value || undefined,
             occurredAt: (fd.get("occurredAt") as string) || undefined,
             description: (fd.get("description") as string) || undefined,
             attachments: uploadedFiles.value.length > 0 ? JSON.stringify(uploadedFiles.value) : undefined,
@@ -477,13 +487,15 @@ export default component$(() => {
             )}
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="label" for="eev-unified-cat">Categoria / Subcategoria</label>
-                <select id="eev-unified-cat" name="unifiedCategory" class="input select"
-                  value={editingEvent.value ? `${editingEvent.value.category}::${editingEvent.value.subCategory || ""}` : ""}
-                >
-                  <option value="">Selecione...</option>
-                  {UNIFIED_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
-                </select>
+                <Combobox
+                  options={categoryComboOptions}
+                  value={editUnifiedCategory.value}
+                  onChange$={(val) => { editUnifiedCategory.value = val; }}
+                  placeholder="Buscar categoria..."
+                  label="Categoria / Subcategoria"
+                  id="eev-unified-cat"
+                  name="unifiedCategory"
+                />
               </div>
               <div>
                 <label class="label" for="eev-date">Data do Evento</label>
