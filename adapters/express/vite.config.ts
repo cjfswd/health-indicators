@@ -10,10 +10,24 @@ export default extendConfig(baseConfig, () => {
       ssr: true,
       rollupOptions: {
         input: ["src/entry.express.tsx", "@qwik-city-plan"],
+        external: [
+          "pdfmake",
+          "pdfmake/js/Printer.js",
+          "pdfmake/js/UrlResolver.js",
+          "exceljs",
+          "@electric-sql/pglite",
+        ],
       },
     },
     ssr: {
       noExternal: true,
+      external: [
+        "pdfmake",
+        "pdfmake/js/Printer.js",
+        "pdfmake/js/UrlResolver.js",
+        "exceljs",
+        "@electric-sql/pglite",
+      ],
     },
   };
 });
