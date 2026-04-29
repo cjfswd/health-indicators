@@ -37,7 +37,7 @@ COPY --from=builder /app/drizzle ./drizzle
 # Environment
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV ORIGIN=http://localhost:3000
+ENV ORIGIN=https://indicadores.healthmaiscuidados.com
 
 EXPOSE 3000
 
