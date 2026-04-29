@@ -14,16 +14,20 @@ import express from "express";
 import compression from "compression";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
+import { readFileSync } from "node:fs";
 
 // Directories
 const distDir = join(fileURLToPath(import.meta.url), "..", "..", "dist");
 const buildDir = join(distDir, "build");
 
+// Load manifest via fs to avoid Node 22 ESM JSON import issues
+const manifest = JSON.parse(readFileSync(join(distDir, "q-manifest.json"), "utf-8"));
+
 // Create the Qwik City express middleware
 const { router, notFound } = createQwikCity({
   render,
   qwikCityPlan,
-  manifest: (await import(join(distDir, "q-manifest.json"), { with: { type: "json" } })).default,
+  manifest,
 });
 
 // Create the express server
