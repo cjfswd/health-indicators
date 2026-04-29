@@ -1,21 +1,24 @@
 import { component$ } from "@builder.io/qwik";
 import { useLocation } from "@builder.io/qwik-city";
-import { LuMenu, LuChevronRight } from "@qwikest/icons/lucide";
+import { LuMenu, LuChevronRight, LuLogOut } from "@qwikest/icons/lucide";
 import { ThemeToggle } from "./theme-toggle";
 
 interface HeaderProps {
   onMenuToggle$: () => void;
+  userEmail?: string;
+  userName?: string;
+  userPicture?: string;
 }
 
 const ROUTE_LABELS: Record<string, string> = {
   "/": "Dashboard",
   "/pacientes/": "Pacientes",
-  "/operadoras/": "Operadoras",
   "/eventos/": "Eventos",
+  "/metas/": "Metas",
   "/auditoria/": "Auditoria",
 };
 
-export const Header = component$<HeaderProps>(({ onMenuToggle$ }) => {
+export const Header = component$<HeaderProps>(({ onMenuToggle$, userEmail, userName, userPicture }) => {
   const loc = useLocation();
 
   // Build breadcrumb
@@ -50,7 +53,7 @@ export const Header = component$<HeaderProps>(({ onMenuToggle$ }) => {
 
         {/* Breadcrumb */}
         <nav class="flex items-center gap-1 text-sm" aria-label="Breadcrumb">
-          <span style={{ color: "var(--text-tertiary)" }}>HealthPanel</span>
+          <span style={{ color: "var(--text-tertiary)" }}>Health Indicators</span>
           {segments.length > 0 && (
             <>
               <LuChevronRight
@@ -82,8 +85,48 @@ export const Header = component$<HeaderProps>(({ onMenuToggle$ }) => {
         </nav>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-3">
+        {/* User info */}
+        {userEmail && (
+          <div class="hidden sm:flex items-center gap-2">
+            {userPicture && (
+              <img
+                src={userPicture}
+                alt={userName || userEmail}
+                width={28}
+                height={28}
+                class="rounded-full"
+                style={{ border: "2px solid var(--border-default)" }}
+              />
+            )}
+            <div class="text-right">
+              {userName && (
+                <p class="m-0 text-xs font-medium" style={{ color: "var(--text-primary)", lineHeight: "1.2" }}>
+                  {userName}
+                </p>
+              )}
+              <p class="m-0 text-xs" style={{ color: "var(--text-tertiary)", lineHeight: "1.2" }}>
+                {userEmail}
+              </p>
+            </div>
+          </div>
+        )}
+
         <ThemeToggle />
+
+        {/* Logout */}
+        {userEmail && (
+          <form method="post" action="/api/auth/logout/">
+            <button
+              type="submit"
+              class="btn btn-ghost btn-icon btn-sm"
+              title="Sair"
+              style={{ color: "var(--text-tertiary)" }}
+            >
+              <LuLogOut style={{ width: "18px", height: "18px" }} />
+            </button>
+          </form>
+        )}
       </div>
     </header>
   );

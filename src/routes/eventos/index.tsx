@@ -1,5 +1,6 @@
 import { component$, useSignal, useStore, $ } from "@builder.io/qwik";
 import { type DocumentHead, routeLoader$, routeAction$, zod$, z } from "@builder.io/qwik-city";
+import { useUserSession } from "../layout";
 import { eq, and, isNull, sql, desc, gte, lte, like } from "drizzle-orm";
 import { db } from "~/db/dev-database";
 import { events, patients, healthOperators } from "~/db/schema";
@@ -214,6 +215,7 @@ export const useDeleteEvent = routeAction$(
 
 // ── Component ────────────────────────────────────────────
 export default component$(() => {
+  const session = useUserSession();
   const eventsData = useEvents();
   const patientOptions = usePatientOptions();
   const operatorOptions = useOperatorOptions();
@@ -353,11 +355,13 @@ export default component$(() => {
                   >
                     <LuPencil style={{ width: "15px", height: "15px" }} />
                   </button>
-                  <button type="button" class="btn btn-ghost btn-icon btn-sm" title="Remover" style={{ color: "var(--color-danger)" }}
-                    onClick$={() => (deletingId.value = ev.id)}
-                  >
-                    <LuTrash2 style={{ width: "15px", height: "15px" }} />
-                  </button>
+                  {session.value.isAdmin && (
+                    <button type="button" class="btn btn-ghost btn-icon btn-sm" title="Remover" style={{ color: "var(--color-danger)" }}
+                      onClick$={() => (deletingId.value = ev.id)}
+                    >
+                      <LuTrash2 style={{ width: "15px", height: "15px" }} />
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -389,7 +393,7 @@ export default component$(() => {
             attachments: uploadedFiles.value.length > 0 ? JSON.stringify(uploadedFiles.value) : undefined,
           };
           const result = await createAction.submit(payload);
-          if (result.value.success) { showCreateModal.value = false; addToast("success", result.value.message); }
+          if (result.value.success) { showCreateModal.value = false; addToast("success", result.value.message); window.location.reload(); }
           else addToast("error", result.value.message);
         }}>
           <div class="space-y-4">
@@ -461,7 +465,7 @@ export default component$(() => {
             attachments: uploadedFiles.value.length > 0 ? JSON.stringify(uploadedFiles.value) : undefined,
           };
           const result = await updateAction.submit(payload);
-          if (result.value.success) { editingEvent.value = null; addToast("success", result.value.message); }
+          if (result.value.success) { editingEvent.value = null; addToast("success", result.value.message); window.location.reload(); }
           else addToast("error", result.value.message);
         }}>
           <div class="space-y-4">
@@ -522,7 +526,7 @@ export default component$(() => {
           if (!deletingId.value) return;
           const result = await deleteAction.submit({ id: deletingId.value });
           deletingId.value = null;
-          if (result.value.success) addToast("success", result.value.message);
+          if (result.value.success) { addToast("success", result.value.message); window.location.reload(); }
           else addToast("error", result.value.message);
         }}
         onCancel$={() => (deletingId.value = null)}
@@ -532,6 +536,6 @@ export default component$(() => {
 });
 
 export const head: DocumentHead = {
-  title: "Eventos — HealthPanel",
+  title: "Eventos — Health Indicators",
   meta: [{ name: "description", content: "Registre e acompanhe ocorrências médicas." }],
 };

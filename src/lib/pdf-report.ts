@@ -1,5 +1,5 @@
 /**
- * PDF Report Generator — pdfmake-based C-level report
+ * PDF Report Generator — pdfmake-based report
  */
 
 import type { TDocumentDefinitions, Content } from "pdfmake/interfaces";
@@ -36,39 +36,64 @@ function statusColor(status: string) {
 }
 
 export async function generatePdfBuffer(data: ReportData): Promise<Buffer> {
-  // Dynamic import avoids Vite bundling issues with CJS pdfmake
+  // Dynamic imports for pdfmake v0.3 server-side usage
   const pdfMakeModule = await import("pdfmake/js/Printer.js" as any);
-  const PdfPrinter = pdfMakeModule.default || pdfMakeModule;
+  const urlResolverModule = await import("pdfmake/js/UrlResolver.js" as any);
+  const pdfmakeMain = await import("pdfmake" as any);
+
+  // Handle CJS→ESM interop double-wrapping
+  const PdfPrinter = pdfMakeModule.default?.default || pdfMakeModule.default;
+  const UrlResolver = urlResolverModule.default?.default || urlResolverModule.default;
+  const virtualfs = pdfmakeMain.default?.virtualfs || pdfmakeMain.virtualfs;
 
   // Resolve font paths relative to node_modules
   const { resolve } = await import("node:path");
   const basePath = resolve(process.cwd(), "node_modules/pdfmake/build/fonts/Roboto");
 
-  const printer = new PdfPrinter({
-    Roboto: {
-      normal: resolve(basePath, "Roboto-Regular.ttf"),
-      bold: resolve(basePath, "Roboto-Medium.ttf"),
-      italics: resolve(basePath, "Roboto-Italic.ttf"),
-      bolditalics: resolve(basePath, "Roboto-MediumItalic.ttf"),
+  const urlResolver = new UrlResolver();
+  const printer = new PdfPrinter(
+    {
+      Roboto: {
+        normal: resolve(basePath, "Roboto-Regular.ttf"),
+        bold: resolve(basePath, "Roboto-Medium.ttf"),
+        italics: resolve(basePath, "Roboto-Italic.ttf"),
+        bolditalics: resolve(basePath, "Roboto-MediumItalic.ttf"),
+      },
     },
-  });
+    virtualfs,
+    urlResolver
+  );
+
+  // Read logo and watermark images as base64
+  const { readFileSync } = await import("node:fs");
+  const logoPath = resolve(process.cwd(), "public/images/logo.png");
+  const watermarkPath = resolve(process.cwd(), "public/images/watermark.png");
+  const logoBase64 = `data:image/png;base64,${readFileSync(logoPath).toString("base64")}`;
+  const watermarkBase64 = `data:image/png;base64,${readFileSync(watermarkPath).toString("base64")}`;
 
   const docDefinition: TDocumentDefinitions = {
     pageSize: "A4",
-    pageMargins: [40, 60, 40, 60],
+    pageMargins: [40, 80, 40, 60],
+
+    // Watermark on every page
+    background: () => ({
+      image: watermarkBase64,
+      width: 300,
+      absolutePosition: { x: 150, y: 250 },
+    }),
 
     header: {
       columns: [
         {
-          text: "HealthPanel",
-          style: "headerBrand",
-          margin: [40, 20, 0, 0],
+          image: logoBase64,
+          width: 120,
+          margin: [40, 15, 0, 0] as [number, number, number, number],
         },
         {
           text: `Relatório de Indicadores — ${data.periodLabel}`,
           style: "headerSubtitle",
-          alignment: "right",
-          margin: [0, 22, 40, 0],
+          alignment: "right" as const,
+          margin: [0, 30, 40, 0] as [number, number, number, number],
         },
       ],
     },
@@ -92,7 +117,7 @@ export async function generatePdfBuffer(data: ReportData): Promise<Buffer> {
     content: [
       // ── Title ──────────────────────────────────
       {
-        text: `Relatório C-Level — ${data.periodLabel}`,
+        text: `Relatório — ${data.periodLabel}`,
         style: "title",
         margin: [0, 0, 0, 4] as [number, number, number, number],
       },
@@ -110,19 +135,17 @@ export async function generatePdfBuffer(data: ReportData): Promise<Buffer> {
       },
       {
         table: {
-          widths: ["*", "*", "*", "*"],
+          widths: ["*", "*", "*"],
           body: [
             [
               { text: "Pacientes Ativos", style: "statLabel" },
               { text: "Operadoras", style: "statLabel" },
               { text: "Eventos no Período", style: "statLabel" },
-              { text: "Registros Auditados", style: "statLabel" },
             ],
             [
               { text: String(data.stats.activePatientsCount), style: "statValue" },
               { text: String(data.stats.activeOperatorsCount), style: "statValue" },
               { text: String(data.stats.currentEventsCount), style: "statValue" },
-              { text: String(data.stats.ledgerTotalCount), style: "statValue" },
             ],
           ],
         },
@@ -162,6 +185,7 @@ export async function generatePdfBuffer(data: ReportData): Promise<Buffer> {
         },
         layout: {
           fillColor: (rowIndex: number) => rowIndex === 0 ? COLORS.headerBg : null,
+          fillOpacity: (rowIndex: number) => rowIndex === 0 ? 1 : 0.5,
           hLineColor: () => COLORS.border,
           vLineColor: () => COLORS.border,
           paddingTop: () => 6,
@@ -190,12 +214,12 @@ export async function generatePdfBuffer(data: ReportData): Promise<Buffer> {
               { text: "Status", style: "tableHeader" },
             ],
             ...data.indicators.map((ind, i) => [
-              { text: ind.code, bold: true, fillColor: i % 2 ? COLORS.altRowBg : null },
-              { text: ind.name, fillColor: i % 2 ? COLORS.altRowBg : null },
+              { text: ind.code, bold: !ind.isChild, color: ind.isChild ? COLORS.muted : undefined, fillColor: i % 2 ? COLORS.altRowBg : null },
+              { text: ind.isChild ? `  ${ind.name}` : ind.name, color: ind.isChild ? COLORS.muted : undefined, fillColor: i % 2 ? COLORS.altRowBg : null },
               { text: String(ind.currentValue), alignment: "center" as const, fillColor: i % 2 ? COLORS.altRowBg : null },
               {
                 text: ind.targetValue !== null
-                  ? `${ind.targetDirection === "lower_is_better" ? "≤" : "≥"} ${ind.targetValue}%`
+                  ? `${ind.targetDirection === "lower_is_better" ? "≤" : "≥"} ${ind.targetValue}${ind.targetFormat === "percentage" ? "%" : ""}`
                   : "—",
                 alignment: "center" as const,
                 fillColor: i % 2 ? COLORS.altRowBg : null,
@@ -211,6 +235,7 @@ export async function generatePdfBuffer(data: ReportData): Promise<Buffer> {
         },
         layout: {
           fillColor: (rowIndex: number) => rowIndex === 0 ? COLORS.headerBg : null,
+          fillOpacity: (rowIndex: number) => rowIndex === 0 ? 1 : 0.5,
           hLineColor: () => COLORS.border,
           vLineColor: () => COLORS.border,
           paddingTop: () => 6,
@@ -247,6 +272,7 @@ export async function generatePdfBuffer(data: ReportData): Promise<Buffer> {
               },
               layout: {
                 fillColor: (rowIndex: number) => rowIndex === 0 ? COLORS.headerBg : null,
+                fillOpacity: (rowIndex: number) => rowIndex === 0 ? 1 : 0.5,
                 hLineColor: () => COLORS.border,
                 vLineColor: () => COLORS.border,
                 paddingTop: () => 6,
@@ -290,6 +316,7 @@ export async function generatePdfBuffer(data: ReportData): Promise<Buffer> {
               },
               layout: {
                 fillColor: (rowIndex: number) => rowIndex === 0 ? COLORS.headerBg : null,
+                fillOpacity: (rowIndex: number) => rowIndex === 0 ? 1 : 0.5,
                 hLineColor: () => COLORS.border,
                 vLineColor: () => COLORS.border,
                 paddingTop: () => 4,
@@ -335,10 +362,11 @@ export async function generatePdfBuffer(data: ReportData): Promise<Buffer> {
     defaultStyle: { fontSize: 9, font: "Roboto" },
   };
 
-  return new Promise<Buffer>((resolve, reject) => {
-    const pdfDoc = printer.createPdfKitDocument(docDefinition);
-    const chunks: Buffer[] = [];
+  // createPdfKitDocument is async in pdfmake v0.3
+  const pdfDoc = await printer.createPdfKitDocument(docDefinition);
 
+  return new Promise<Buffer>((resolve, reject) => {
+    const chunks: Buffer[] = [];
     pdfDoc.on("data", (chunk: Buffer) => chunks.push(chunk));
     pdfDoc.on("end", () => resolve(Buffer.concat(chunks)));
     pdfDoc.on("error", (err: Error) => reject(err));

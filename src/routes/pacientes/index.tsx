@@ -6,6 +6,7 @@ import {
   zod$,
   z,
 } from "@builder.io/qwik-city";
+import { useUserSession } from "../layout";
 import { eq, and, isNull, like, sql, desc } from "drizzle-orm";
 import { db } from "~/db/dev-database";
 import { patients, healthOperators } from "~/db/schema";
@@ -62,7 +63,7 @@ export const usePatients = routeLoader$(async ({ query }) => {
   return {
     data: data.map((d) => ({
       ...d,
-      dateOfBirth: d.dateOfBirth.toISOString(),
+      dateOfBirth: d.dateOfBirth?.toISOString() || null,
       admissionDate: d.admissionDate?.toISOString() || null,
       createdAt: d.createdAt.toISOString(),
       updatedAt: d.updatedAt.toISOString(),
@@ -89,7 +90,7 @@ export const useCreatePatient = routeAction$(
   async (data) => {
     const [created] = await db.insert(patients).values({
       fullName: data.fullName,
-      dateOfBirth: new Date(data.dateOfBirth),
+      dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
       gender: data.gender as any,
       careModality: data.careModality as any,
       operatorId: data.operatorId,
@@ -101,7 +102,7 @@ export const useCreatePatient = routeAction$(
   },
   zod$({
     fullName: z.string().min(1).max(255),
-    dateOfBirth: z.string().min(1),
+    dateOfBirth: z.string().optional(),
     gender: z.enum(["masculino", "feminino", "outro"]),
     careModality: z.enum(["AD", "ID"]),
     operatorId: z.string().uuid(),
@@ -123,6 +124,7 @@ export const useUpdatePatient = routeAction$(
     if (data.operatorId) updateData.operatorId = data.operatorId;
     if (data.admissionDate) updateData.admissionDate = new Date(data.admissionDate);
     if (data.attachments) updateData.attachments = JSON.parse(data.attachments);
+    if (data.active !== undefined) updateData.active = data.active === "true";
 
     const [updated] = await db.update(patients).set(updateData).where(eq(patients.id, data.id)).returning();
     await logUpdate("patients", data.id, existing as any, updated as any);
@@ -137,6 +139,7 @@ export const useUpdatePatient = routeAction$(
     operatorId: z.string().uuid().optional(),
     admissionDate: z.string().optional(),
     attachments: z.string().optional(),
+    active: z.string().optional(),
   })
 );
 
@@ -175,6 +178,7 @@ export const useRestorePatient = routeAction$(
 
 // ── Component ────────────────────────────────────────────
 export default component$(() => {
+  const session = useUserSession();
   const patientsData = usePatients();
   const operatorOptions = useOperatorOptions();
   const createAction = useCreatePatient();
@@ -368,30 +372,26 @@ export default component$(() => {
                     >
                       <LuPencil style={{ width: "15px", height: "15px" }} />
                     </button>
-                    <button type="button" class="btn btn-ghost btn-icon btn-sm" title={p.active ? "Desativar" : "Ativar"}
+                    {session.value.isAdmin && (
+                      <button type="button" class="btn btn-ghost btn-icon btn-sm" title="Remover" style={{ color: "var(--color-danger)" }}
+                        onClick$={() => (deletingId.value = p.id)}
+                      >
+                        <LuTrash2 style={{ width: "15px", height: "15px" }} />
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  session.value.isAdmin && (
+                    <button type="button" class="btn btn-ghost btn-sm"
                       onClick$={async () => {
-                        const result = await toggleAction.submit({ id: p.id });
+                        const result = await restoreAction.submit({ id: p.id });
                         if (result.value.success) addToast("success", result.value.message);
                       }}
                     >
-                      {p.active ? <LuToggleRight style={{ width: "18px", height: "18px", color: "var(--color-success)" }} /> : <LuToggleLeft style={{ width: "18px", height: "18px", color: "var(--text-tertiary)" }} />}
+                      <LuRotateCcw style={{ width: "15px", height: "15px" }} />
+                      Restaurar
                     </button>
-                    <button type="button" class="btn btn-ghost btn-icon btn-sm" title="Remover" style={{ color: "var(--color-danger)" }}
-                      onClick$={() => (deletingId.value = p.id)}
-                    >
-                      <LuTrash2 style={{ width: "15px", height: "15px" }} />
-                    </button>
-                  </>
-                ) : (
-                  <button type="button" class="btn btn-ghost btn-sm"
-                    onClick$={async () => {
-                      const result = await restoreAction.submit({ id: p.id });
-                      if (result.value.success) addToast("success", result.value.message);
-                    }}
-                  >
-                    <LuRotateCcw style={{ width: "15px", height: "15px" }} />
-                    Restaurar
-                  </button>
+                  )
                 )}
               </div>
             </div>
@@ -425,7 +425,7 @@ export default component$(() => {
             attachments: uploadedFiles.value.length > 0 ? JSON.stringify(uploadedFiles.value) : undefined,
           };
           const result = await createAction.submit(payload);
-          if (result.value.success) { showCreateModal.value = false; addToast("success", result.value.message); }
+          if (result.value.success) { showCreateModal.value = false; addToast("success", result.value.message); window.location.reload(); }
           else addToast("error", result.value.message);
         }}>
           <div class="space-y-4">
@@ -435,8 +435,8 @@ export default component$(() => {
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="label" for="p-dob">Data de Nascimento <span style={{ color: "var(--color-danger)" }}>*</span></label>
-                <input id="p-dob" name="dateOfBirth" type="date" class="input" required />
+                <label class="label" for="p-dob">Data de Nascimento</label>
+                <input id="p-dob" name="dateOfBirth" type="date" class="input" />
               </div>
               <div>
                 <label class="label" for="p-admission">Data de Admissão</label>
@@ -455,8 +455,8 @@ export default component$(() => {
               <div>
                 <label class="label" for="p-modality">Modalidade <span style={{ color: "var(--color-danger)" }}>*</span></label>
                 <select id="p-modality" name="careModality" class="input select">
-                  <option value="AD">AD — Atenção Domiciliar</option>
-                  <option value="ID">ID — Internação Domiciliar</option>
+                  <option value="AD">AD</option>
+                  <option value="ID">ID</option>
                 </select>
               </div>
             </div>
@@ -503,9 +503,10 @@ export default component$(() => {
             operatorId: editOperatorId.value,
             admissionDate: (fd.get("admissionDate") as string) || undefined,
             attachments: uploadedFiles.value.length > 0 ? JSON.stringify(uploadedFiles.value) : undefined,
+            active: fd.get("active") as string,
           };
           const result = await updateAction.submit(payload);
-          if (result.value.success) { editingPatient.value = null; addToast("success", result.value.message); }
+          if (result.value.success) { editingPatient.value = null; addToast("success", result.value.message); window.location.reload(); }
           else addToast("error", result.value.message);
         }}>
           <div class="space-y-4">
@@ -515,8 +516,8 @@ export default component$(() => {
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="label" for="ep-dob">Data de Nascimento <span style={{ color: "var(--color-danger)" }}>*</span></label>
-                <input id="ep-dob" name="dateOfBirth" type="date" class="input" value={editingPatient.value?.dateOfBirth?.split("T")[0]} required />
+                <label class="label" for="ep-dob">Data de Nascimento</label>
+                <input id="ep-dob" name="dateOfBirth" type="date" class="input" value={editingPatient.value?.dateOfBirth?.split("T")[0]} />
               </div>
               <div>
                 <label class="label" for="ep-admission">Data de Admissão</label>
@@ -552,6 +553,13 @@ export default component$(() => {
                 required
               />
             </div>
+            <div>
+              <label class="label" for="ep-status">Status</label>
+              <select id="ep-status" name="active" class="input select"  value={editingPatient.value?.active ? "true" : "false"}>
+                <option value="true">Ativo</option>
+                <option value="false">Inativo</option>
+              </select>
+            </div>
             <FileUpload
               label="Anexos"
               value={uploadedFiles.value}
@@ -584,6 +592,6 @@ export default component$(() => {
 });
 
 export const head: DocumentHead = {
-  title: "Pacientes — HealthPanel",
+  title: "Pacientes — Health Indicators",
   meta: [{ name: "description", content: "Gerencie o cadastro de pacientes." }],
 };

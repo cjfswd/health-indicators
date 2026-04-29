@@ -41,7 +41,9 @@ export interface ReportData {
     targetValue: number | null;
     targetDirection: string | null;
     targetTimeframe: string | null;
+    targetFormat: string;
     isInformational: boolean;
+    isChild: boolean;
     status: "within_target" | "outside_target" | "no_data" | "informational";
   }[];
 
@@ -54,13 +56,6 @@ export interface ReportData {
     description: string | null;
   }[];
 
-  ledgerEntries: {
-    timestamp: string;
-    operation: string;
-    tableName: string;
-    recordId: string;
-    performedBy: string;
-  }[];
 }
 
 function getMonthBoundaries(offset = 0) {
@@ -182,18 +177,50 @@ export async function generateReportData(
       pct: Math.round((count / (currentEventsCount || 1)) * 100),
     }));
 
-  // ── Indicators ────────────────────────────────────
-  const indRows = await db
+  // ── Indicators (parents + children, hierarchically ordered) ──
+  const allIndRows = await db
     .select()
     .from(indicatorDefinitions)
-    .where(and(
-      eq(indicatorDefinitions.active, true),
-      sql`${indicatorDefinitions.parentId} IS NULL`,
-    ))
+    .where(eq(indicatorDefinitions.active, true))
     .orderBy(indicatorDefinitions.code);
 
-  const indicators = indRows.map((i) => {
-    const currentValue = categoryMap[i.eventCategory || ""] || 0;
+  // Separate parents and children
+  const parentRows = allIndRows.filter((i) => i.parentId === null);
+  const childRows = allIndRows.filter((i) => i.parentId !== null);
+
+  // Build hierarchical list: parent followed by its children
+  const orderedRows: (typeof allIndRows[0] & { isChild: boolean })[] = [];
+  for (const parent of parentRows) {
+    orderedRows.push({ ...parent, isChild: false });
+    const children = childRows
+      .filter((c) => c.parentId === parent.id)
+      .sort((a, b) => a.code.localeCompare(b.code));
+    for (const child of children) {
+      orderedRows.push({ ...child, isChild: true });
+    }
+  }
+
+  // Build subcategory count map for child indicators
+  const subCatRows = await db
+    .select({ subCategory: events.subCategory, count: sql<number>`count(*)` })
+    .from(events)
+    .where(and(
+      isNull(events.deletedAt),
+      gte(events.occurredAt, currentStart),
+      lte(events.occurredAt, currentEnd),
+    ))
+    .groupBy(events.subCategory);
+
+  const subCategoryMap: Record<string, number> = {};
+  for (const row of subCatRows) {
+    if (row.subCategory) subCategoryMap[row.subCategory] = Number(row.count);
+  }
+
+  const indicators = orderedRows.map((i) => {
+    // Use eventCategory count for parents, eventSubCategory count for children
+    const currentValue = i.isChild
+      ? (subCategoryMap[i.eventSubCategory || ""] || 0)
+      : (categoryMap[i.eventCategory || ""] || 0);
     const hasTarget = i.targetValue !== null && i.targetValue !== undefined;
     let status: "within_target" | "outside_target" | "no_data" | "informational" = "informational";
 
@@ -216,7 +243,9 @@ export async function generateReportData(
       targetValue: i.targetValue,
       targetDirection: i.targetDirection,
       targetTimeframe: i.targetTimeframe,
+      targetFormat: i.targetFormat,
       isInformational: i.isInformational,
+      isChild: i.isChild,
       status,
     };
   });
@@ -251,26 +280,7 @@ export async function generateReportData(
     description: e.description,
   }));
 
-  // ── Ledger Entries ────────────────────────────────
-  const ledgerRows = await db
-    .select({
-      timestamp: ledger.timestamp,
-      operation: ledger.operation,
-      tableName: ledger.tableName,
-      recordId: ledger.recordId,
-      performedBy: ledger.performedBy,
-    })
-    .from(ledger)
-    .orderBy(desc(ledger.timestamp))
-    .limit(200);
 
-  const ledgerEntries = ledgerRows.map((l) => ({
-    timestamp: formatDateTime(l.timestamp),
-    operation: l.operation,
-    tableName: l.tableName,
-    recordId: l.recordId,
-    performedBy: l.performedBy,
-  }));
 
   return {
     period,
@@ -289,6 +299,5 @@ export async function generateReportData(
     categoryBreakdown,
     indicators,
     eventDetails,
-    ledgerEntries,
   };
 }

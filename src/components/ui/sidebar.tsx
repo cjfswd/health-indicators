@@ -3,10 +3,9 @@ import { Link, useLocation } from "@builder.io/qwik-city";
 import {
   LuLayoutDashboard,
   LuUsers,
-  LuBuilding2,
   LuCalendarClock,
+  LuTarget,
   LuShieldCheck,
-  LuActivity,
   LuChevronLeft,
   LuChevronRight,
 } from "@qwikest/icons/lucide";
@@ -14,6 +13,7 @@ import {
 interface SidebarProps {
   isOpen: boolean;
   collapsed: boolean;
+  isAdmin: boolean;
   onClose$: () => void;
   onToggleCollapse$: () => void;
 }
@@ -21,8 +21,8 @@ interface SidebarProps {
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: "dashboard" },
   { href: "/pacientes/", label: "Pacientes", icon: "users" },
-  { href: "/operadoras/", label: "Operadoras", icon: "building" },
   { href: "/eventos/", label: "Eventos", icon: "calendar" },
+  { href: "/metas/", label: "Metas", icon: "target" },
   { href: "/auditoria/", label: "Auditoria", icon: "shield" },
 ] as const;
 
@@ -33,10 +33,10 @@ const IconMap = component$<{ name: string }>(({ name }) => {
       return <LuLayoutDashboard style={style} />;
     case "users":
       return <LuUsers style={style} />;
-    case "building":
-      return <LuBuilding2 style={style} />;
     case "calendar":
       return <LuCalendarClock style={style} />;
+    case "target":
+      return <LuTarget style={style} />;
     case "shield":
       return <LuShieldCheck style={style} />;
     default:
@@ -44,8 +44,12 @@ const IconMap = component$<{ name: string }>(({ name }) => {
   }
 });
 
-export const Sidebar = component$<SidebarProps>(({ isOpen, collapsed, onClose$, onToggleCollapse$ }) => {
+export const Sidebar = component$<SidebarProps>(({ isOpen, collapsed, isAdmin, onClose$, onToggleCollapse$ }) => {
   const loc = useLocation();
+  const visibleItems = NAV_ITEMS.filter((item) => {
+    if (item.href === "/auditoria/" && !isAdmin) return false;
+    return true;
+  });
 
   return (
     <>
@@ -81,40 +85,20 @@ export const Sidebar = component$<SidebarProps>(({ isOpen, collapsed, onClose$, 
           }}
         >
           <Link href="/" class="flex items-center gap-3 no-underline" onClick$={onClose$}>
-            <div
-              class="flex items-center justify-center rounded-xl"
-              style={{
-                width: "36px",
-                height: "36px",
-                minWidth: "36px",
-                background: "linear-gradient(135deg, var(--color-primary-500), var(--color-accent-500))",
-              }}
-            >
-              <LuActivity style={{ width: "20px", height: "20px", color: "white" }} />
-            </div>
-            {!collapsed && (
-              <div>
-                <h1
-                  class="m-0 text-base font-bold"
-                  style={{ color: "var(--text-primary)", lineHeight: "1.2", whiteSpace: "nowrap" }}
-                >
-                  HealthPanel
-                </h1>
-                <span
-                  class="text-xs"
-                  style={{ color: "var(--text-tertiary)", whiteSpace: "nowrap" }}
-                >
-                  Gestão Domiciliar
-                </span>
-              </div>
-            )}
+            <img
+              src="/images/logo.png"
+              alt="Health Indicators"
+              width={collapsed ? 32 : 150}
+              height={collapsed ? 32 : 48}
+              style={{ objectFit: "contain" }}
+            />
           </Link>
         </div>
 
         {/* Navigation */}
         <nav class="flex-1 overflow-y-auto px-2 py-4" style={{ paddingLeft: collapsed ? "8px" : undefined, paddingRight: collapsed ? "8px" : undefined }}>
           <ul class="m-0 list-none p-0 space-y-1">
-            {NAV_ITEMS.map((item) => {
+            {visibleItems.map((item) => {
               const isActive =
                 item.href === "/"
                   ? loc.url.pathname === "/"

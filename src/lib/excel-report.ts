@@ -59,8 +59,11 @@ function autoWidth(ws: ExcelJS.Worksheet) {
 }
 
 export async function generateExcelBuffer(data: ReportData): Promise<Buffer> {
+  const { resolve } = await import("node:path");
+  const logoPath = resolve(process.cwd(), "public/images/logo.png");
+
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "HealthPanel";
+  workbook.creator = "Health Indicators";
   workbook.created = new Date();
 
   // ═══════════════════════════════════════════════════
@@ -70,22 +73,32 @@ export async function generateExcelBuffer(data: ReportData): Promise<Buffer> {
     properties: { tabColor: { argb: COLORS.primary } },
   });
 
-  // Title
-  wsResumo.mergeCells("A1:D1");
-  const titleCell = wsResumo.getCell("A1");
-  titleCell.value = `Relatório C-Level — ${data.periodLabel}`;
+  // Logo (rows 1-3)
+  const logoId = workbook.addImage({ filename: logoPath, extension: "png" });
+  wsResumo.addImage(logoId, {
+    tl: { col: 0, row: 0 },
+    ext: { width: 200, height: 55 },
+  });
+  wsResumo.getRow(1).height = 20;
+  wsResumo.getRow(2).height = 20;
+  wsResumo.getRow(3).height = 20;
+
+  // Title (row 4)
+  wsResumo.mergeCells("A4:D4");
+  const titleCell = wsResumo.getCell("A4");
+  titleCell.value = `Relatório — ${data.periodLabel}`;
   titleCell.font = { bold: true, size: 16, color: { argb: COLORS.primary } };
   titleCell.alignment = { horizontal: "left" };
 
-  wsResumo.mergeCells("A2:D2");
-  const subtitleCell = wsResumo.getCell("A2");
+  wsResumo.mergeCells("A5:D5");
+  const subtitleCell = wsResumo.getCell("A5");
   subtitleCell.value = `Período: ${data.periodStart} a ${data.periodEnd} | Gerado: ${data.generatedAt}`;
   subtitleCell.font = { size: 9, color: { argb: COLORS.muted } };
 
   // Stats
-  wsResumo.getCell("A4").value = "Métrica";
-  wsResumo.getCell("B4").value = "Valor";
-  const statsHeader = wsResumo.getRow(4);
+  wsResumo.getCell("A7").value = "Métrica";
+  wsResumo.getCell("B7").value = "Valor";
+  const statsHeader = wsResumo.getRow(7);
   applyHeaderStyle(statsHeader);
 
   const statsData = [
@@ -93,7 +106,6 @@ export async function generateExcelBuffer(data: ReportData): Promise<Buffer> {
     ["Total de Pacientes", data.stats.totalPatientsCount],
     ["Operadoras Ativas", data.stats.activeOperatorsCount],
     ["Eventos no Período", data.stats.currentEventsCount],
-    ["Registros Auditados", data.stats.ledgerTotalCount],
   ];
 
   statsData.forEach(([label, value], i) => {
@@ -118,7 +130,7 @@ export async function generateExcelBuffer(data: ReportData): Promise<Buffer> {
   });
 
   autoWidth(wsResumo);
-  wsResumo.views = [{ state: "frozen", ySplit: 4 }];
+  wsResumo.views = [{ state: "frozen", ySplit: 7 }];
 
   // ═══════════════════════════════════════════════════
   // Sheet 2: Indicadores
@@ -156,12 +168,14 @@ export async function generateExcelBuffer(data: ReportData): Promise<Buffer> {
       informational: "Informacional",
     };
 
+    const displayName = ind.isChild ? `    ${ind.name}` : ind.name;
+
     const row = wsInd.addRow({
       code: ind.code,
-      name: ind.name,
+      name: displayName,
       currentValue: ind.currentValue,
       target: ind.targetValue !== null
-        ? `${ind.targetDirection === "lower_is_better" ? "≤" : "≥"} ${ind.targetValue}%`
+        ? `${ind.targetDirection === "lower_is_better" ? "≤" : "≥"} ${ind.targetValue}${ind.targetFormat === "percentage" ? "%" : ""}`
         : "—",
       direction: ind.targetDirection === "higher_is_better"
         ? "Maior é melhor"
@@ -173,6 +187,15 @@ export async function generateExcelBuffer(data: ReportData): Promise<Buffer> {
     });
 
     applyAltRowStyle(row, i);
+
+    // Style parent rows bold, child rows lighter
+    if (!ind.isChild) {
+      row.getCell("code").font = { bold: true, size: 10 };
+      row.getCell("name").font = { bold: true, size: 10 };
+    } else {
+      row.getCell("code").font = { size: 9, color: { argb: COLORS.muted } };
+      row.getCell("name").font = { size: 9, color: { argb: COLORS.muted } };
+    }
 
     // Color the status cell
     const statusCell = row.getCell("status");
@@ -218,45 +241,6 @@ export async function generateExcelBuffer(data: ReportData): Promise<Buffer> {
   });
 
   wsEvents.views = [{ state: "frozen", ySplit: 1 }];
-
-  // ═══════════════════════════════════════════════════
-  // Sheet 4: Auditoria
-  // ═══════════════════════════════════════════════════
-  const wsAudit = workbook.addWorksheet("Auditoria", {
-    properties: { tabColor: { argb: COLORS.muted } },
-  });
-
-  wsAudit.columns = [
-    { header: "Data/Hora", key: "timestamp", width: 22 },
-    { header: "Operação", key: "operation", width: 14 },
-    { header: "Tabela", key: "table", width: 18 },
-    { header: "ID do Registro", key: "recordId", width: 38 },
-    { header: "Executado por", key: "performedBy", width: 30 },
-  ];
-
-  applyHeaderStyle(wsAudit.getRow(1));
-
-  data.ledgerEntries.forEach((l, i) => {
-    const row = wsAudit.addRow({
-      timestamp: l.timestamp,
-      operation: l.operation,
-      table: l.tableName,
-      recordId: l.recordId,
-      performedBy: l.performedBy,
-    });
-    applyAltRowStyle(row, i);
-
-    // Color operation
-    const opCell = row.getCell("operation");
-    switch (l.operation) {
-      case "CREATE": opCell.font = { bold: true, color: { argb: COLORS.success } }; break;
-      case "UPDATE": opCell.font = { bold: true, color: { argb: COLORS.primary } }; break;
-      case "DELETE": opCell.font = { bold: true, color: { argb: COLORS.danger } }; break;
-      case "RESTORE": opCell.font = { bold: true, color: { argb: COLORS.warning } }; break;
-    }
-  });
-
-  wsAudit.views = [{ state: "frozen", ySplit: 1 }];
 
   // ── Generate Buffer ───────────────────────────────
   const buffer = await workbook.xlsx.writeBuffer();

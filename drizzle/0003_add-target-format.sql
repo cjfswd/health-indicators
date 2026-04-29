@@ -1,0 +1,2 @@
+CREATE TYPE "public"."target_format" AS ENUM('percentage', 'numeric');--> statement-breakpoint
+ALTER TABLE "indicator_definitions" ADD COLUMN "target_format" "target_format" DEFAULT 'percentage' NOT NULL;

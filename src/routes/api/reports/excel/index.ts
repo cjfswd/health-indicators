@@ -14,7 +14,7 @@ export const onGet: RequestHandler = async ({ query, send }) => {
     const data = await generateReportData(period);
     const excelBuffer = await generateExcelBuffer(data);
 
-    const filename = `healthpanel-relatorio-${data.periodLabel.replace(/\s+/g, "-").toLowerCase()}.xlsx`;
+    const filename = `Health Indicators-relatorio-${data.periodLabel.replace(/\s+/g, "-").toLowerCase()}.xlsx`;
 
     send(
       new Response(excelBuffer, {

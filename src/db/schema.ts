@@ -64,6 +64,13 @@ export const targetTimeframeEnum = pgEnum("target_timeframe", [
   "annual",
 ]);
 
+/** KPI target format — determines how the value is displayed */
+export const targetFormatEnum = pgEnum("target_format", [
+  "percentage",
+  "numeric",
+]);
+
+
 /** Event/occurrence primary category — maps to indicator families */
 export const eventCategoryEnum = pgEnum("event_category", [
   "alta_domiciliar",          // 01 - Taxa de Altas Domiciliares
@@ -155,7 +162,7 @@ export const patients = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     fullName: varchar("full_name", { length: 255 }).notNull(),
-    dateOfBirth: timestamp("date_of_birth", { mode: "date", withTimezone: true }).notNull(),
+    dateOfBirth: timestamp("date_of_birth", { mode: "date", withTimezone: true }),
     gender: genderEnum("gender").notNull(),
     careModality: careModalityEnum("care_modality").notNull(),
 
@@ -278,6 +285,9 @@ export const indicatorDefinitions = pgTable(
 
     /** How often is this target evaluated? */
     targetTimeframe: targetTimeframeEnum("target_timeframe"),
+
+    /** Display format for the target value */
+    targetFormat: targetFormatEnum("target_format").default("percentage").notNull(),
 
     /** True if this indicator is purely informational (no target) */
     isInformational: boolean("is_informational").default(false).notNull(),

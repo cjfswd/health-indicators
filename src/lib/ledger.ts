@@ -9,7 +9,7 @@
 import { db } from "~/db/dev-database";
 import { ledger } from "~/db/schema";
 
-const DEFAULT_USER = "sistema@healthpanel.local";
+const DEFAULT_USER = "sistema@Health Indicators.local";
 
 export async function logCreate(
   tableName: string,

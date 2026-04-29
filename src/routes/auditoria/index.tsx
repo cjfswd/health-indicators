@@ -152,9 +152,17 @@ function canReverse(entry: any, latestOpMap: Record<string, string>): { allowed:
   }
   return { allowed: true, reason: "" };
 }
+import { getSession } from "~/lib/auth";
+import { isAdmin } from "~/lib/permissions";
 
 // ── Data Loader ──────────────────────────────────────────
-export const useLedger = routeLoader$(async ({ query }) => {
+export const useLedger = routeLoader$(async ({ query, cookie, redirect }) => {
+  // Admin-only guard
+  const session = getSession(cookie);
+  if (!session || !isAdmin(session.email)) {
+    throw redirect(302, "/");
+  }
+
   const page = parseInt(query.get("page") || "1");
   const pageSize = parseInt(query.get("pageSize") || "20");
   const tableName = query.get("tableName");
@@ -593,6 +601,6 @@ export default component$(() => {
 });
 
 export const head: DocumentHead = {
-  title: "Auditoria — HealthPanel",
+  title: "Auditoria — Health Indicators",
   meta: [{ name: "description", content: "Registro imutável de todas as operações (append-only ledger)." }],
 };

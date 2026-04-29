@@ -9,7 +9,7 @@
 
 import { eq } from "drizzle-orm";
 import { db, getPGliteClient } from "./dev-database";
-import { indicatorDefinitions } from "./schema";
+import { indicatorDefinitions, healthOperators } from "./schema";
 
 interface IndicatorSeed {
   code: string;
@@ -243,6 +243,20 @@ const INDICATORS: IndicatorSeed[] = [
 ];
 
 async function seed() {
+  // ── Seed Health Operators ──────────────────────────────
+  console.log("🌱 Seeding health operators...\n");
+  const existingOps = await db.select().from(healthOperators);
+  if (existingOps.length > 0) {
+    console.log(`⚠️  Found ${existingOps.length} existing operators. Skipping.`);
+  } else {
+    for (const name of ["Unimed", "Camperj"]) {
+      await db.insert(healthOperators).values({ name });
+      console.log(`  ✅ ${name}`);
+    }
+    console.log("");
+  }
+
+  // ── Seed Indicator Definitions ─────────────────────────
   console.log("🌱 Seeding indicator definitions...\n");
 
   // Check if indicators already exist

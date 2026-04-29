@@ -9,16 +9,13 @@ import {
 import { eq, and, isNull, like, sql, asc } from "drizzle-orm";
 import { db } from "~/db/dev-database";
 import { healthOperators } from "~/db/schema";
-import { logCreate, logUpdate, logDelete, logRestore } from "~/lib/ledger";
+import { logCreate, logUpdate } from "~/lib/ledger";
 import { Modal } from "~/components/ui/modal";
-import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { ToastContainer, createToast, type ToastData } from "~/components/ui/toast";
 import { FileUpload, type UploadedFile } from "~/components/ui/file-upload";
 import {
   LuPlus,
   LuPencil,
-  LuTrash2,
-  LuRotateCcw,
   LuSearch,
   LuBuilding2,
   LuChevronLeft,
@@ -103,41 +100,16 @@ export const useUpdateOperator = routeAction$(
   })
 );
 
-export const useDeleteOperator = routeAction$(
-  async (data) => {
-    const [existing] = await db.select().from(healthOperators).where(eq(healthOperators.id, data.id));
-    if (!existing) return { success: false, message: "Operadora não encontrada." };
 
-    await db.update(healthOperators).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(healthOperators.id, data.id));
-    await logDelete("health_operators", data.id, existing as any);
-    return { success: true, message: "Operadora removida." };
-  },
-  zod$({ id: z.string().uuid() })
-);
-
-export const useRestoreOperator = routeAction$(
-  async (data) => {
-    const [existing] = await db.select().from(healthOperators).where(eq(healthOperators.id, data.id));
-    if (!existing) return { success: false, message: "Operadora não encontrada." };
-
-    const [restored] = await db.update(healthOperators).set({ deletedAt: null, updatedAt: new Date() }).where(eq(healthOperators.id, data.id)).returning();
-    await logRestore("health_operators", data.id, existing as any, restored as any);
-    return { success: true, message: "Operadora restaurada!" };
-  },
-  zod$({ id: z.string().uuid() })
-);
 
 // ── Component ────────────────────────────────────────────
 export default component$(() => {
   const operators = useOperators();
   const createAction = useCreateOperator();
   const updateAction = useUpdateOperator();
-  const deleteAction = useDeleteOperator();
-  const restoreAction = useRestoreOperator();
 
   const showCreateModal = useSignal(false);
   const editingId = useSignal<string | null>(null);
-  const deletingId = useSignal<string | null>(null);
   const toasts = useStore<{ items: ToastData[] }>({ items: [] });
 
   const editName = useSignal("");
@@ -225,7 +197,6 @@ export default component$(() => {
               <tr>
                 <th>Nome</th>
                 <th style={{ width: "180px" }}>Criado em</th>
-                <th style={{ width: "120px" }}>Status</th>
                 <th style={{ width: "120px" }}>Ações</th>
               </tr>
             </thead>
@@ -247,54 +218,18 @@ export default component$(() => {
                     {new Date(op.createdAt).toLocaleDateString("pt-BR")}
                   </td>
                   <td>
-                    <span class={op.deletedAt ? "badge badge-danger" : "badge badge-success"}>
-                      <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "currentColor" }} />
-                      {op.deletedAt ? "Removida" : "Ativa"}
-                    </span>
-                  </td>
-                  <td>
-                    <div class="flex items-center gap-1">
-                      {!op.deletedAt ? (
-                        <>
-                          <button
-                            type="button"
-                            class="btn btn-ghost btn-icon btn-sm"
-                            title="Editar"
-                            onClick$={() => {
-                              editingId.value = op.id;
-                              editName.value = op.name;
-                              uploadedFiles.value = op.attachments || [];
-                            }}
-                          >
-                            <LuPencil style={{ width: "15px", height: "15px" }} />
-                          </button>
-                          <button
-                            type="button"
-                            class="btn btn-ghost btn-icon btn-sm"
-                            title="Remover"
-                            style={{ color: "var(--color-danger)" }}
-                            onClick$={() => (deletingId.value = op.id)}
-                          >
-                            <LuTrash2 style={{ width: "15px", height: "15px" }} />
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          class="btn btn-ghost btn-sm"
-                          title="Restaurar"
-                          onClick$={async () => {
-                            const result = await restoreAction.submit({ id: op.id });
-                            if (result.value.success) {
-                              addToast("success", result.value.message);
-                            }
-                          }}
-                        >
-                          <LuRotateCcw style={{ width: "15px", height: "15px" }} />
-                          Restaurar
-                        </button>
-                      )}
-                    </div>
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-icon btn-sm"
+                      title="Editar"
+                      onClick$={() => {
+                        editingId.value = op.id;
+                        editName.value = op.name;
+                        uploadedFiles.value = op.attachments || [];
+                      }}
+                    >
+                      <LuPencil style={{ width: "15px", height: "15px" }} />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -457,29 +392,12 @@ export default component$(() => {
         </form>
       </Modal>
 
-      {/* Delete Confirmation */}
-      <ConfirmDialog
-        isOpen={!!deletingId.value}
-        title="Remover Operadora"
-        message="Tem certeza que deseja remover esta operadora? A operação pode ser revertida pela auditoria."
-        confirmLabel="Remover"
-        onConfirm$={async () => {
-          if (!deletingId.value) return;
-          const result = await deleteAction.submit({ id: deletingId.value });
-          deletingId.value = null;
-          if (result.value.success) {
-            addToast("success", result.value.message);
-          } else {
-            addToast("error", result.value.message);
-          }
-        }}
-        onCancel$={() => (deletingId.value = null)}
-      />
+
     </div>
   );
 });
 
 export const head: DocumentHead = {
-  title: "Operadoras — HealthPanel",
+  title: "Operadoras — Health Indicators",
   meta: [{ name: "description", content: "Gerencie as operadoras de saúde (convênios)." }],
 };

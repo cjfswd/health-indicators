@@ -1,4 +1,4 @@
-import { component$, useSignal, type QRL, useTask$ } from "@builder.io/qwik";
+import { component$, useSignal, type QRL } from "@builder.io/qwik";
 import { LuChevronsUpDown, LuCheck, LuX } from "@qwikest/icons/lucide";
 
 export interface ComboboxOption {
@@ -22,6 +22,7 @@ export const Combobox = component$<ComboboxProps>((props) => {
   const isOpen = useSignal(false);
   const query = useSignal("");
   const highlightedIndex = useSignal(-1);
+  const isMouseOverDropdown = useSignal(false);
 
   const filteredOptions = props.options.filter((opt) =>
     opt.label.toLowerCase().includes(query.value.toLowerCase())
@@ -82,8 +83,10 @@ export const Combobox = component$<ComboboxProps>((props) => {
             }
           }}
           onBlur$={() => {
-            // Delay to allow click on option
-            setTimeout(() => (isOpen.value = false), 200);
+            // Only close if the mouse is NOT hovering over the dropdown
+            if (!isMouseOverDropdown.value) {
+              isOpen.value = false;
+            }
           }}
         />
 
@@ -123,6 +126,12 @@ export const Combobox = component$<ComboboxProps>((props) => {
             maxHeight: "220px",
             overflowY: "auto",
           }}
+          onMouseEnter$={() => {
+            isMouseOverDropdown.value = true;
+          }}
+          onMouseLeave$={() => {
+            isMouseOverDropdown.value = false;
+          }}
         >
           {filteredOptions.length === 0 ? (
             <div
@@ -152,6 +161,7 @@ export const Combobox = component$<ComboboxProps>((props) => {
                 onClick$={() => {
                   props.onChange$(opt.value);
                   isOpen.value = false;
+                  isMouseOverDropdown.value = false;
                 }}
                 onMouseEnter$={() => (highlightedIndex.value = i)}
               >

@@ -14,7 +14,7 @@ export const onGet: RequestHandler = async ({ query, send }) => {
     const data = await generateReportData(period);
     const pdfBuffer = await generatePdfBuffer(data);
 
-    const filename = `healthpanel-relatorio-${data.periodLabel.replace(/\s+/g, "-").toLowerCase()}.pdf`;
+    const filename = `Health Indicators-relatorio-${data.periodLabel.replace(/\s+/g, "-").toLowerCase()}.pdf`;
 
     send(
       new Response(pdfBuffer, {
@@ -27,9 +27,12 @@ export const onGet: RequestHandler = async ({ query, send }) => {
       })
     );
   } catch (error) {
-    console.error("PDF generation error:", error);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errStack = error instanceof Error ? error.stack : "";
+    console.error("PDF generation error:", errMsg);
+    console.error("Stack:", errStack);
     send(
-      new Response(JSON.stringify({ error: "Failed to generate PDF report" }), {
+      new Response(JSON.stringify({ error: "Failed to generate PDF report", detail: errMsg }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
       })

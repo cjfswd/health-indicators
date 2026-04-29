@@ -227,6 +227,7 @@ export const useDashboardData = routeLoader$(async ({ query }) => {
       targetValue: i.targetValue,
       targetDirection: i.targetDirection,
       targetTimeframe: i.targetTimeframe,
+      targetFormat: i.targetFormat,
       isInformational: i.isInformational,
       eventCategory: i.eventCategory,
       currentValue: categoryMap[i.eventCategory || ""] || 0,
@@ -513,7 +514,7 @@ export default component$(() => {
               <div class="mt-2 flex items-center justify-between">
                 <p class="m-0 text-xs" style={{ color: "var(--text-tertiary)" }}>
                   {hasTarget
-                    ? `Meta: ${ind.targetDirection === "lower_is_better" ? "≤" : "≥"} ${ind.targetValue}% (${
+                    ? `Meta: ${ind.targetDirection === "lower_is_better" ? "≤" : "≥"} ${ind.targetValue}${ind.targetFormat === "percentage" ? "%" : ""} (${
                         ind.targetTimeframe === "monthly" ? "mensal"
                         : ind.targetTimeframe === "quarterly" ? "trimestral"
                         : ind.targetTimeframe || "—"
@@ -619,7 +620,7 @@ export default component$(() => {
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 class="m-0 text-base font-semibold" style={{ color: "var(--text-primary)" }}>
-              📊 Exportar Relatório C-Level
+              📊 Exportar Relatório
             </h3>
             <p class="m-0 mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
               Gere um relatório completo com indicadores, eventos e auditoria ({periodLabel.toLowerCase()})
@@ -652,6 +653,6 @@ export default component$(() => {
 });
 
 export const head: DocumentHead = {
-  title: "Dashboard — HealthPanel",
-  meta: [{ name: "description", content: "Visão geral dos indicadores de saúde domiciliar para relatórios C-level." }],
+  title: "Dashboard — Health Indicators",
+  meta: [{ name: "description", content: "Visão geral dos indicadores de saúde domiciliar." }],
 };
