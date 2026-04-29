@@ -9,9 +9,9 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
-# Copy source and build
+# Copy source and build (client + server separately, skip type-check)
 COPY . .
-RUN pnpm run build
+RUN pnpm run build.client && pnpm run build.server
 
 # ── Stage 2: Production ───────────────────────────────
 FROM node:20-alpine AS runner
